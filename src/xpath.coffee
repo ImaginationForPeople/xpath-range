@@ -2,9 +2,11 @@ $ = require('jquery')
 Util = require('./util')
 
 evaluateXPath = (xp, root = document, nsResolver = null) ->
+  if not xp
+    return root
   try
     document.evaluate(
-      '.' + xp,
+      xp,
       root,
       nsResolver,
       XPathResult.FIRST_ORDERED_NODE_TYPE,
@@ -25,8 +27,17 @@ evaluateXPath = (xp, root = document, nsResolver = null) ->
     node = root
     for step in steps
       [name, idx] = step.split "["
-      idx = if idx? then parseInt (idx?.split "]")[0] else 1
-      node = findChild node, name.toLowerCase(), idx
+      # idx = if idx? then parseInt (idx?.split "]")[0] else 1
+      # node = findChild node, name.toLowerCase(), idx
+      if idx
+        if idx.substr(0, 4) == '@id='
+          id = idx.substr(5, idx.length - 2)
+          node = document.findElementById(id)
+        else
+          idx = parseInt (idx?.split "]")[0]
+          node = findChild node, name.toLowerCase(), idx
+      else
+        node = findChild node, name.toLowerCase(), 1
     node
 
 # Get xpath strings to the provided nodes relative to the provided root
@@ -41,6 +52,10 @@ simpleXPathJQuery = ($el, relativeRoot) ->
 
     while elem?.nodeType == Util.NodeTypes.ELEMENT_NODE and elem != relativeRoot
       tagName = elem.tagName.replace(":", "\\:")
+      if elem.id
+        # TODO check uniqueness
+        tagName = elem.tagName.toLoweCase()
+        return "//#{tagName}[@id='#{elem.id}']/#{path}"
       idx = $(elem.parentNode).children(tagName).index(elem) + 1
 
       idx  = "[#{idx}]"
@@ -60,8 +75,11 @@ simpleXPathPure = ($el, relativeRoot) ->
 
   getPathSegment = (node) ->
     name = getNodeName node
+    if node.id
+      # TODO check uniqueness
+      return "//#{name}[@id='#{node.id}']"
     pos = getNodePosition node
-    "#{name}[#{pos}]"
+    "/#{name}[#{pos}]"
 
   rootNode = relativeRoot
 
@@ -71,10 +89,10 @@ simpleXPathPure = ($el, relativeRoot) ->
       unless node?
         throw new Error("Called getPathTo on a node which was not a descendant
                          of @rootNode. " + rootNode)
-      xpath = (getPathSegment node) + '/' + xpath
+      xpath = (getPathSegment node) + xpath
+      if xpath.charAt(1) == '/'
+        break
       node = node.parentNode
-    xpath = '/' + xpath
-    xpath = xpath.replace /\/$/, ''
     xpath
 
   jq = $el.map ->
@@ -117,11 +135,12 @@ getNodePosition = (node) ->
   pos
 
 fromNode = ($el, relativeRoot) ->
-  try
-    result = simpleXPathJQuery $el, relativeRoot
-  catch exception
-    result = simpleXPathPure $el, relativeRoot
-  result
+  simpleXPathPure $el, relativeRoot
+  # try
+  #   result = simpleXPathJQuery $el, relativeRoot
+  # catch exception
+  #   result = simpleXPathPure $el, relativeRoot
+  # result
 
 # Public: Finds an Element Node using an XPath relative to the document root.
 #
