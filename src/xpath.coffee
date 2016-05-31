@@ -54,7 +54,7 @@ simpleXPathJQuery = ($el, relativeRoot) ->
       tagName = elem.tagName.replace(":", "\\:")
       if elem.id
         # TODO check uniqueness
-        tagName = elem.tagName.toLoweCase()
+        tagName = elem.tagName.toLowerCase()
         return "//#{tagName}[@id='#{elem.id}']/#{path}"
       idx = $(elem.parentNode).children(tagName).index(elem) + 1
 
